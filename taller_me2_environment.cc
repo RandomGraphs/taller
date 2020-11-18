@@ -1,4 +1,3 @@
-%%writefile scratch/taller_gym/sim.cc
 #include "ns3/command-line.h"
 #include "ns3/config.h"
 #include "ns3/uinteger.h"
@@ -15,6 +14,17 @@
 #include "ns3/ipv4-list-routing-helper.h"
 #include "ns3/internet-stack-helper.h"
 #include "ns3/netanim-module.h"
+#include "ns3/core-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/mobility-module.h"
+#include "ns3/wifi-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/traffic-control-module.h"
+#include "ns3/spectrum-module.h"
+#include "ns3/stats-module.h"
+#include "ns3/flow-monitor-module.h"
+#include "ns3/node-list.h"
+#include "ns3/opengym-module.h"
 //// NS3-GYM
 #include "ns3/rng-seed-manager.h"
 #include "ns3/opengym-module.h"
@@ -22,8 +32,9 @@
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("OpenGym");
+NS_LOG_COMPONENT_DEFINE ("Taller_ME");
 
+//// NS3-GYM
 /*
 Define observation space
 */
@@ -127,6 +138,8 @@ void ScheduleNextStateRead(double envStepTime, Ptr<OpenGymInterface> openGym){
   Simulator::Schedule (Seconds(envStepTime), &ScheduleNextStateRead, envStepTime, openGym);
   openGym->NotifyCurrentState();
 }
+//// NS3-GYM
+
 
 uint32_t bridgeAB_id;
 uint32_t bridgeAC_id;
@@ -144,7 +157,6 @@ Ipv4InterfaceContainer ipv4Interface_Cluster_C;
 
 // Función generadora de tráfico
 static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval) {
-  NS_LOG_UNCOND ("Sending packet");
   if (pktCount > 0) {
       socket->Send (Create<Packet> (pktSize));
       Simulator::Schedule (pktInterval, &GenerateTraffic,
@@ -194,23 +206,23 @@ int main (int argc, char *argv[]) {
   //--------------------------------------------------------------
 
   std::string phyMode ("DsssRate1Mbps");
-  double distanceA = 100;  // distancia inicial entre nodos en el cuadrante A
-  double distanceB = 100;  // distancia inicial entre nodos en el cuadrante B
-  double distanceC = 100;  // distancia inicial entre nodos en el cuadranteC
+  double distanceA = 50;  // distancia inicial entre nodos en el cuadrante A
+  double distanceB = 50;  // distancia inicial entre nodos en el cuadrante B
+  double distanceC = 50;  // distancia inicial entre nodos en el cuadranteC
   packetSize = 1024; // tamaño de los paquetes en bytes
   uint32_t numPackets = 20; // numero de paquetes a enviar 
   uint32_t numNodesA = 25;  // numero de nodos cuandrante A
   uint32_t numNodesB = 25;  // numero de nodos cuandrante B
   uint32_t numNodesC = 25;  // numero de nodos cuandrante C
-  double originA_x = numNodesB/5 * 100 + 10;  // coordenada x origen del cuandrante A
-  double originA_y = numNodesB/5 * 100 + 10;  // coordenada y origen del cuandrante A
-  double originB_x = 100.0;  // coordenada x origen del cuandrante B
-  double originB_y = 100.0;  // coordenada y origen del cuandrante B
-  double originC_x = (numNodesB+numNodesA)/5 * 100 + 10;  // coordenada x origen del cuandrante C
-  double originC_y = 100.0;  // coordenada y origen del cuandrante C
+  double originA_x = numNodesB/5 * 50 + 10;  // coordenada x origen del cuandrante A
+  double originA_y = numNodesB/5 * 50 + 10;  // coordenada y origen del cuandrante A
+  double originB_x = 50.0;  // coordenada x origen del cuandrante B
+  double originB_y = 50.0;  // coordenada y origen del cuandrante B
+  double originC_x = (numNodesB+numNodesA)/5 * 50 + 10;  // coordenada x origen del cuandrante C
+  double originC_y = 50.0;  // coordenada y origen del cuandrante C
   char sourceCluster = 'B'; // Sector de origen de los paquetes
   char sinkCluster = 'C'; // Sector de llegada de los paquetes
-  interval = 0.1; // Intevalo entre paquetes
+  interval = 1; // Intevalo entre paquetes
   bool verbose = false;
   bool tracing = false;
 
@@ -222,7 +234,24 @@ int main (int argc, char *argv[]) {
   uint32_t testArg = 0;
   //// NS3-GYM
 
-  // Se agregan las varibles a la linea de comandos como parametros que pueden ser recibidos al ejecutar la simulación
+  //Aplicar la semilla de la simulacion
+  RngSeedManager::SetSeed (7);
+  RngSeedManager::SetRun (simSeed);
+
+  //Definicion del nodo de salida y llegada
+  Ptr<UniformRandomVariable> startNodeValue = CreateObject<UniformRandomVariable> ();
+  startNodeValue->SetAttribute ("Min", DoubleValue (0.0));
+  startNodeValue->SetAttribute ("Max", DoubleValue (numNodesB-2));
+
+  sourceNode = startNodeValue->GetInteger(); // numero del nodo de salida
+
+  Ptr<UniformRandomVariable> endNodeValue = CreateObject<UniformRandomVariable> ();
+  endNodeValue->SetAttribute ("Min", DoubleValue (0.0));
+  endNodeValue->SetAttribute ("Max", DoubleValue (numNodesC-2));
+
+  sinkNode = endNodeValue->GetInteger(); // numero del nodo de llegada
+
+ // Se agregan las varibles a la linea de comandos como parametros que pueden ser recibidos al ejecutar la simulación
   CommandLine cmd;
   cmd.AddValue ("distanceA", "distance (m)A", distanceA);
   cmd.AddValue ("distanceB", "distance (m)B", distanceB);
@@ -239,22 +268,44 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("originA_y", "Origin y sector A", originA_y);
   cmd.AddValue ("originB_x", "Origin x sector B", originB_x);
   cmd.AddValue ("originB_y", "Origin y sector B", originB_y);
-  cmd.AddValue ("originC_x", "Origin x sector C",originC_x);
+  cmd.AddValue ("originC_x", "Origin x sector C", originC_x);
   cmd.AddValue ("originC_y", "Origin y sector C", originC_y);
   cmd.AddValue ("sinkNode", "Receiver node number", sinkNode);
-  cmd.AddValue ("sourceNode", "Sender node number", sourceNode);
-
+  cmd.AddValue  ("sourceNode", "Sender node number", sourceNode);
   //// NS3-GYM
-  // required parameters for OpenGym interface
   cmd.AddValue ("openGymPort", "Port number for OpenGym env. Default: 5555", openGymPort);
   cmd.AddValue ("simSeed", "Seed for random generator. Default: 1", simSeed);
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds. Default: 10s", simulationTime);
   cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
   //// NS3-GYM
-
   cmd.Parse (argc, argv);
 
+  uint32_t simTime = numPackets*interval*2+1;
+
+  //parametros por consola
+  NS_LOG_UNCOND("Ns3Env parameters:");
+  NS_LOG_UNCOND("--simTime: " << simTime);
+  NS_LOG_UNCOND("--distanceA: " << distanceA);
+  NS_LOG_UNCOND("--distanceB: " << distanceB);
+  NS_LOG_UNCOND("--distanceC: " << distanceC);
+  NS_LOG_UNCOND("--packetSize: " << packetSize);
+  NS_LOG_UNCOND("--numPackets: " << numPackets);
+  NS_LOG_UNCOND("--interval: " << interval);
+  NS_LOG_UNCOND("--verbose: " << verbose);
+  NS_LOG_UNCOND("--tracing: " << tracing);
+  NS_LOG_UNCOND("--numNodesA: " << numNodesA);
+  NS_LOG_UNCOND("--numNodesB: " << numNodesB);
+  NS_LOG_UNCOND("--numNodesC: " << numNodesC);
+  NS_LOG_UNCOND("--originA_x: " << originA_x);
+  NS_LOG_UNCOND("--originA_y: " << originA_y);
+  NS_LOG_UNCOND("--originB_x: " << originB_x);
+  NS_LOG_UNCOND("--originB_y: " << originB_y);
+  NS_LOG_UNCOND("--originC_x: " << originC_x);
+  NS_LOG_UNCOND("--originC_y: " << originC_y);
+  NS_LOG_UNCOND("--sinkNode: " << sinkNode);
+  NS_LOG_UNCOND("--sourceNode: " << sourceNode);
+  
   //// NS3-GYM
   NS_LOG_UNCOND("Ns3Env parameters:");
   NS_LOG_UNCOND("--simulationTime: " << simulationTime);
@@ -277,8 +328,6 @@ int main (int argc, char *argv[]) {
   Simulator::Schedule (Seconds(0.0), &ScheduleNextStateRead, envStepTime, openGym);
   //// NS3-GYM
 
-  //uint32_t simTime = numPackets*interval+1;
-
   // Se parsea el intervalo como un objeto de tiempo
   Time interPacketInterval = Seconds (interval);
 
@@ -296,7 +345,7 @@ int main (int argc, char *argv[]) {
 
   // Si el sector de salida y llegada no es A, B o C, se establece un predeterminado
   if (sourceCluster!='A' && sourceCluster!='B' && sourceCluster!='C'){
-      sourceCluster = 'A';
+      sourceCluster = 'B';
   }
   if (sinkCluster!='A' && sinkCluster!='B' && sinkCluster!='C'){
       sinkCluster = 'C';
@@ -560,10 +609,15 @@ int main (int argc, char *argv[]) {
   Simulator::Schedule (Seconds (20.0), &GenerateTraffic,
                        source, packetSize, numPackets, interPacketInterval);
 
+  // Se muestran las IDs globales de los nodos elegidos aleatoriamente
+  NS_LOG_UNCOND("SourceNode "<<sourceNode<<" ID: "<<cluster_B.Get (sourceNode)->GetId());
+  NS_LOG_UNCOND("SinkNode "<<sinkNode<<" ID: "<<cluster_C.Get (sinkNode)->GetId());
+
   // Mensaje indicando la fuente y el destino de los mensajes
   NS_LOG_UNCOND ("Testing from node " << sourceNode << " of " << sourceCluster << " to " << sinkNode << " of " << sinkCluster << " with grid distance " << distanceA);
 
-  Simulator::Stop (Seconds (simulationTime));
+
+  Simulator::Stop (Seconds (simTime));
 
   // Generación del archivo .xml para la animación con NetAnim
   AnimationInterface anim ("wifi_Anim.xml"); // Mandatory
@@ -574,9 +628,7 @@ int main (int argc, char *argv[]) {
 
   Simulator::Run ();
 
-  // NS3-GYM
   openGym->NotifySimulationEnd();
-  // NS3-GYM
 
   Simulator::Destroy ();
 
