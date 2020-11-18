@@ -1,74 +1,4 @@
-/* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
-/*
- * Copyright (c) 2009 University of Washington
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation;
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- */
-
-//
-// This program configures a grid (default 5x5) of nodes on an
-// 802.11b physical layer, with
-// 802.11b NICs in adhoc mode, and by default, sends one packet of 1000
-// (application) bytes to node 1.
-//
-// The default layout is like this, on a 2-D grid.
-//
-// n20  n21  n22  n23  n24
-// n15  n16  n17  n18  n19
-// n10  n11  n12  n13  n14
-// n5   n6   n7   n8   n9
-// n0   n1   n2   n3   n4
-//
-// the layout is affected by the parameters given to GridPositionAllocator;
-// by default, GridWidth is 5 and numNodes is 25..
-//
-// There are a number of command-line options available to control
-// the default behavior.  The list of available command-line options
-// can be listed with the following command:
-// ./waf --run "wifi-simple-adhoc-grid --help"
-//
-// Note that all ns-3 attributes (not just the ones exposed in the below
-// script) can be changed at command line; see the ns-3 documentation.
-//
-// For instance, for this configuration, the physical layer will
-// stop successfully receiving packets when distance increases beyond
-// the default of 500m.
-// To see this effect, try running:
-//
-// ./waf --run "wifi-simple-adhoc --distance=500"
-// ./waf --run "wifi-simple-adhoc --distance=1000"
-// ./waf --run "wifi-simple-adhoc --distance=1500"
-//
-// The source node and sink node can be changed like this:
-//
-// ./waf --run "wifi-simple-adhoc --sourceNode=20 --sinkNode=10"
-//
-// This script can also be helpful to put the Wifi layer into verbose
-// logging mode; this command will turn on all wifi logging:
-//
-// ./waf --run "wifi-simple-adhoc-grid --verbose=1"
-//
-// By default, trace file writing is off-- to enable it, try:
-// ./waf --run "wifi-simple-adhoc-grid --tracing=1"
-//
-// When you are done tracing, you will notice many pcap trace files
-// in your directory.  If you have tcpdump installed, you can try this:
-//
-// tcpdump -r wifi-simple-adhoc-grid-0-0.pcap -nn -tt
-//
-
+%%writefile scratch/taller_gym/sim.cc
 #include "ns3/command-line.h"
 #include "ns3/config.h"
 #include "ns3/uinteger.h"
@@ -85,10 +15,118 @@
 #include "ns3/ipv4-list-routing-helper.h"
 #include "ns3/internet-stack-helper.h"
 #include "ns3/netanim-module.h"
+//// NS3-GYM
+#include "ns3/rng-seed-manager.h"
+#include "ns3/opengym-module.h"
+//// NS3-GYM
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE ("Taller_ME");
+NS_LOG_COMPONENT_DEFINE ("OpenGym");
+
+/*
+Define observation space
+*/
+Ptr<OpenGymSpace> MyGetObservationSpace(void)
+{
+  uint32_t nodeNum = 5;
+  float low = 0.0;
+  float high = 10.0;
+  std::vector<uint32_t> shape = {nodeNum,};
+  std::string dtype = TypeNameGet<uint32_t> ();
+  Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
+  NS_LOG_UNCOND ("MyGetObservationSpace: " << space);
+  return space;
+}
+
+/*
+Define action space
+*/
+Ptr<OpenGymSpace> MyGetActionSpace(void)
+{
+  uint32_t nodeNum = 5;
+
+  Ptr<OpenGymDiscreteSpace> space = CreateObject<OpenGymDiscreteSpace> (nodeNum);
+  NS_LOG_UNCOND ("MyGetActionSpace: " << space);
+  return space;
+}
+
+/*
+Define game over condition
+*/
+bool MyGetGameOver(void)
+{
+
+  bool isGameOver = false;
+  bool test = false;
+  static float stepCounter = 0.0;
+  stepCounter += 1;
+  if (stepCounter == 10 && test) {
+      isGameOver = true;
+  }
+  NS_LOG_UNCOND ("MyGetGameOver: " << isGameOver);
+  return isGameOver;
+}
+
+/*
+Collect observations
+*/
+Ptr<OpenGymDataContainer> MyGetObservation(void)
+{
+  uint32_t nodeNum = 5;
+  uint32_t low = 0.0;
+  uint32_t high = 10.0;
+  Ptr<UniformRandomVariable> rngInt = CreateObject<UniformRandomVariable> ();
+
+  std::vector<uint32_t> shape = {nodeNum,};
+  Ptr<OpenGymBoxContainer<uint32_t> > box = CreateObject<OpenGymBoxContainer<uint32_t> >(shape);
+
+  // generate random data
+  for (uint32_t i = 0; i<nodeNum; i++){
+    uint32_t value = rngInt->GetInteger(low, high);
+    box->AddValue(value);
+  }
+
+  NS_LOG_UNCOND ("MyGetObservation: " << box);
+  return box;
+}
+
+/*
+Define reward function
+*/
+float MyGetReward(void)
+{
+  static float reward = 0.0;
+  reward += 1;
+  return reward;
+}
+
+/*
+Define extra info. Optional
+*/
+std::string MyGetExtraInfo(void)
+{
+  std::string myInfo = "testInfo";
+  myInfo += "|123";
+  NS_LOG_UNCOND("MyGetExtraInfo: " << myInfo);
+  return myInfo;
+}
+
+
+/*
+Execute received actions
+*/
+bool MyExecuteActions(Ptr<OpenGymDataContainer> action)
+{
+  Ptr<OpenGymDiscreteContainer> discrete = DynamicCast<OpenGymDiscreteContainer>(action);
+  NS_LOG_UNCOND ("MyExecuteActions: " << action);
+  return true;
+}
+
+void ScheduleNextStateRead(double envStepTime, Ptr<OpenGymInterface> openGym){
+  Simulator::Schedule (Seconds(envStepTime), &ScheduleNextStateRead, envStepTime, openGym);
+  openGym->NotifyCurrentState();
+}
 
 uint32_t bridgeAB_id;
 uint32_t bridgeAC_id;
@@ -106,6 +144,7 @@ Ipv4InterfaceContainer ipv4Interface_Cluster_C;
 
 // Función generadora de tráfico
 static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval) {
+  NS_LOG_UNCOND ("Sending packet");
   if (pktCount > 0) {
       socket->Send (Create<Packet> (pktSize));
       Simulator::Schedule (pktInterval, &GenerateTraffic,
@@ -159,7 +198,7 @@ int main (int argc, char *argv[]) {
   double distanceB = 100;  // distancia inicial entre nodos en el cuadrante B
   double distanceC = 100;  // distancia inicial entre nodos en el cuadranteC
   packetSize = 1024; // tamaño de los paquetes en bytes
-  uint32_t numPackets = 100; // numero de paquetes a enviar 
+  uint32_t numPackets = 20; // numero de paquetes a enviar 
   uint32_t numNodesA = 25;  // numero de nodos cuandrante A
   uint32_t numNodesB = 25;  // numero de nodos cuandrante B
   uint32_t numNodesC = 25;  // numero de nodos cuandrante C
@@ -171,11 +210,19 @@ int main (int argc, char *argv[]) {
   double originC_y = 100.0;  // coordenada y origen del cuandrante C
   char sourceCluster = 'B'; // Sector de origen de los paquetes
   char sinkCluster = 'C'; // Sector de llegada de los paquetes
-  interval = 1.0; // Intevalo entre paquetes
+  interval = 0.1; // Intevalo entre paquetes
   bool verbose = false;
   bool tracing = false;
 
- // Se agregan las varibles a la linea de comandos como parametros que pueden ser recibidos al ejecutar la simulación
+  //// NS3-GYM
+  uint32_t simSeed = 1;
+  double simulationTime = 10; //seconds
+  double envStepTime = 0.1; //seconds, ns3gym env step time interval
+  uint32_t openGymPort = 5555;
+  uint32_t testArg = 0;
+  //// NS3-GYM
+
+  // Se agregan las varibles a la linea de comandos como parametros que pueden ser recibidos al ejecutar la simulación
   CommandLine cmd;
   cmd.AddValue ("distanceA", "distance (m)A", distanceA);
   cmd.AddValue ("distanceB", "distance (m)B", distanceB);
@@ -192,13 +239,45 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("originA_y", "Origin y sector A", originA_y);
   cmd.AddValue ("originB_x", "Origin x sector B", originB_x);
   cmd.AddValue ("originB_y", "Origin y sector B", originB_y);
-  cmd.AddValue ("originC_x", "Origin x sector C", originC_x);
+  cmd.AddValue ("originC_x", "Origin x sector C",originC_x);
   cmd.AddValue ("originC_y", "Origin y sector C", originC_y);
   cmd.AddValue ("sinkNode", "Receiver node number", sinkNode);
   cmd.AddValue ("sourceNode", "Sender node number", sourceNode);
+
+  //// NS3-GYM
+  // required parameters for OpenGym interface
+  cmd.AddValue ("openGymPort", "Port number for OpenGym env. Default: 5555", openGymPort);
+  cmd.AddValue ("simSeed", "Seed for random generator. Default: 1", simSeed);
+  // optional parameters
+  cmd.AddValue ("simTime", "Simulation time in seconds. Default: 10s", simulationTime);
+  cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
+  //// NS3-GYM
+
   cmd.Parse (argc, argv);
 
-  uint32_t simTime = numPackets*interval+1;
+  //// NS3-GYM
+  NS_LOG_UNCOND("Ns3Env parameters:");
+  NS_LOG_UNCOND("--simulationTime: " << simulationTime);
+  NS_LOG_UNCOND("--openGymPort: " << openGymPort);
+  NS_LOG_UNCOND("--envStepTime: " << envStepTime);
+  NS_LOG_UNCOND("--seed: " << simSeed);
+  NS_LOG_UNCOND("--testArg: " << testArg);
+
+  RngSeedManager::SetSeed (1);
+  RngSeedManager::SetRun (simSeed);
+
+  Ptr<OpenGymInterface> openGym = CreateObject<OpenGymInterface> (openGymPort);
+  openGym->SetGetActionSpaceCb( MakeCallback (&MyGetActionSpace) );
+  openGym->SetGetObservationSpaceCb( MakeCallback (&MyGetObservationSpace) );
+  openGym->SetGetGameOverCb( MakeCallback (&MyGetGameOver) );
+  openGym->SetGetObservationCb( MakeCallback (&MyGetObservation) );
+  openGym->SetGetRewardCb( MakeCallback (&MyGetReward) );
+  openGym->SetGetExtraInfoCb( MakeCallback (&MyGetExtraInfo) );
+  openGym->SetExecuteActionsCb( MakeCallback (&MyExecuteActions) );
+  Simulator::Schedule (Seconds(0.0), &ScheduleNextStateRead, envStepTime, openGym);
+  //// NS3-GYM
+
+  //uint32_t simTime = numPackets*interval+1;
 
   // Se parsea el intervalo como un objeto de tiempo
   Time interPacketInterval = Seconds (interval);
@@ -484,8 +563,7 @@ int main (int argc, char *argv[]) {
   // Mensaje indicando la fuente y el destino de los mensajes
   NS_LOG_UNCOND ("Testing from node " << sourceNode << " of " << sourceCluster << " to " << sinkNode << " of " << sinkCluster << " with grid distance " << distanceA);
 
-
-  Simulator::Stop (Seconds (simTime));
+  Simulator::Stop (Seconds (simulationTime));
 
   // Generación del archivo .xml para la animación con NetAnim
   AnimationInterface anim ("wifi_Anim.xml"); // Mandatory
@@ -495,9 +573,13 @@ int main (int argc, char *argv[]) {
   anim.EnableWifiPhyCounters (Seconds (0), Seconds (10)); //Optional
 
   Simulator::Run ();
+
+  // NS3-GYM
+  openGym->NotifySimulationEnd();
+  // NS3-GYM
+
   Simulator::Destroy ();
 
 
   return 0;
 }
-
