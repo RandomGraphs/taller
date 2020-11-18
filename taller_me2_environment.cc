@@ -34,15 +34,29 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("Taller_ME");
 
+uint32_t bridgeAB_id;
+uint32_t bridgeAC_id;
+
+uint32_t sourceNode = 0; // numero del nodo de salida
+uint32_t sinkNode = 4; // numero del nodo de llegada
+
+int numberOfPackets;
+uint32_t packetSize;
+double interval;
+
+Ipv4InterfaceContainer ipv4Interface_Cluster_A;
+Ipv4InterfaceContainer ipv4Interface_Cluster_B;
+Ipv4InterfaceContainer ipv4Interface_Cluster_C;
+
 //// NS3-GYM
 /*
 Define observation space
 */
 Ptr<OpenGymSpace> MyGetObservationSpace(void)
 {
-  uint32_t nodeNum = 5;
+  uint32_t nodeNum = NodeList::GetNNodes ();
   float low = 0.0;
-  float high = 10.0;
+  float high = 100.0;
   std::vector<uint32_t> shape = {nodeNum,};
   std::string dtype = TypeNameGet<uint32_t> ();
   Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
@@ -55,9 +69,12 @@ Define action space
 */
 Ptr<OpenGymSpace> MyGetActionSpace(void)
 {
-  uint32_t nodeNum = 5;
-
-  Ptr<OpenGymDiscreteSpace> space = CreateObject<OpenGymDiscreteSpace> (nodeNum);
+  uint32_t nodeNum = NodeList::GetNNodes ();
+  float low = 0.0;
+  float high = 100.0;
+  std::vector<uint32_t> shape = {nodeNum,};
+  std::string dtype = TypeNameGet<uint32_t> ();
+  Ptr<OpenGymBoxSpace> space = CreateObject<OpenGymBoxSpace> (low, high, shape, dtype);
   NS_LOG_UNCOND ("MyGetActionSpace: " << space);
   return space;
 }
@@ -105,11 +122,8 @@ Ptr<OpenGymDataContainer> MyGetObservation(void)
 /*
 Define reward function
 */
-float MyGetReward(void)
-{
-  static float reward = 0.0;
-  reward += 1;
-  return reward;
+float MyGetReward(void) {
+  return numberOfPackets;
 }
 
 /*
@@ -140,20 +154,6 @@ void ScheduleNextStateRead(double envStepTime, Ptr<OpenGymInterface> openGym){
 }
 //// NS3-GYM
 
-
-uint32_t bridgeAB_id;
-uint32_t bridgeAC_id;
-
-uint32_t sourceNode = 0; // numero del nodo de salida
-uint32_t sinkNode = 4; // numero del nodo de llegada
-
-int numberOfPackets;
-uint32_t packetSize;
-double interval;
-
-Ipv4InterfaceContainer ipv4Interface_Cluster_A;
-Ipv4InterfaceContainer ipv4Interface_Cluster_B;
-Ipv4InterfaceContainer ipv4Interface_Cluster_C;
 
 // Función generadora de tráfico
 static void GenerateTraffic (Ptr<Socket> socket, uint32_t pktSize, uint32_t pktCount, Time pktInterval) {
@@ -206,28 +206,38 @@ int main (int argc, char *argv[]) {
   //--------------------------------------------------------------
 
   std::string phyMode ("DsssRate1Mbps");
-  double distanceA = 50;  // distancia inicial entre nodos en el cuadrante A
-  double distanceB = 50;  // distancia inicial entre nodos en el cuadrante B
-  double distanceC = 50;  // distancia inicial entre nodos en el cuadranteC
+  //AQUI
+  //AQUI
+  double distanceA = 100;  // distancia inicial entre nodos en el cuadrante A
+  double distanceB = 100;  // distancia inicial entre nodos en el cuadrante B
+  double distanceC = 100;  // distancia inicial entre nodos en el cuadranteC
   packetSize = 1024; // tamaño de los paquetes en bytes
-  uint32_t numPackets = 20; // numero de paquetes a enviar 
+  uint32_t numPackets = 100; // numero de paquetes a enviar 
   uint32_t numNodesA = 25;  // numero de nodos cuandrante A
   uint32_t numNodesB = 25;  // numero de nodos cuandrante B
   uint32_t numNodesC = 25;  // numero de nodos cuandrante C
-  double originA_x = numNodesB/5 * 50 + 10;  // coordenada x origen del cuandrante A
-  double originA_y = numNodesB/5 * 50 + 10;  // coordenada y origen del cuandrante A
-  double originB_x = 50.0;  // coordenada x origen del cuandrante B
-  double originB_y = 50.0;  // coordenada y origen del cuandrante B
-  double originC_x = (numNodesB+numNodesA)/5 * 50 + 10;  // coordenada x origen del cuandrante C
-  double originC_y = 50.0;  // coordenada y origen del cuandrante C
+  double originA_x = 5 * distanceB + 10;  // coordenada x origen del cuandrante A
+  double originA_y = numNodesB/5 * distanceB + 10;  // coordenada y origen del cuandrante A
+  double originB_x = distanceB;  // coordenada x origen del cuandrante B
+  double originB_y = distanceB;  // coordenada y origen del cuandrante B
+  double originC_x = 10 * (distanceB+distanceA)/2;  // coordenada x origen del cuandrante C
+  double originC_y = originA_y-(numNodesC/5 * distanceC)+distanceB;  // coordenada y origen del cuandrante C
+  //AQUI
+  //AQUI
   char sourceCluster = 'B'; // Sector de origen de los paquetes
   char sinkCluster = 'C'; // Sector de llegada de los paquetes
   interval = 1; // Intevalo entre paquetes
   bool verbose = false;
   bool tracing = false;
+  uint32_t simSeed = 5;  //semilla de simulacion
+  //AQUI
+  //AQUI
+  double signalIntensity = -10;
+  //AQUI
+  //AQUI
 
-  //// NS3-GYM
-  uint32_t simSeed = 1;
+  //// NS3-GYM  
+  uint32_t simSeed = 1;  //semilla de simulacion
   double simulationTime = 10; //seconds
   double envStepTime = 0.1; //seconds, ns3gym env step time interval
   uint32_t openGymPort = 5555;
@@ -271,12 +281,18 @@ int main (int argc, char *argv[]) {
   cmd.AddValue ("originC_x", "Origin x sector C", originC_x);
   cmd.AddValue ("originC_y", "Origin y sector C", originC_y);
   cmd.AddValue ("sinkNode", "Receiver node number", sinkNode);
-  cmd.AddValue  ("sourceNode", "Sender node number", sourceNode);
+  cmd.AddValue ("sourceNode", "Sender node number", sourceNode);
+  //AQUI
+  //AQUI
+  cmd.AddValue ("signalIntensity", "Signal Intensity", signalIntensity);
+  //AQUI
+  //AQUI
   //// NS3-GYM
   cmd.AddValue ("openGymPort", "Port number for OpenGym env. Default: 5555", openGymPort);
   cmd.AddValue ("simSeed", "Seed for random generator. Default: 1", simSeed);
   // optional parameters
   cmd.AddValue ("simTime", "Simulation time in seconds. Default: 10s", simulationTime);
+  cmd.AddValue ("envStepTime", "Simulation time in seconds. Default: 0.1s", envStepTime);
   cmd.AddValue ("testArg", "Extra simulation argument. Default: 0", testArg);
   //// NS3-GYM
   cmd.Parse (argc, argv);
@@ -305,7 +321,7 @@ int main (int argc, char *argv[]) {
   NS_LOG_UNCOND("--originC_y: " << originC_y);
   NS_LOG_UNCOND("--sinkNode: " << sinkNode);
   NS_LOG_UNCOND("--sourceNode: " << sourceNode);
-  
+    
   //// NS3-GYM
   NS_LOG_UNCOND("Ns3Env parameters:");
   NS_LOG_UNCOND("--simulationTime: " << simulationTime);
@@ -325,6 +341,7 @@ int main (int argc, char *argv[]) {
   openGym->SetGetRewardCb( MakeCallback (&MyGetReward) );
   openGym->SetGetExtraInfoCb( MakeCallback (&MyGetExtraInfo) );
   openGym->SetExecuteActionsCb( MakeCallback (&MyExecuteActions) );
+  
   Simulator::Schedule (Seconds(0.0), &ScheduleNextStateRead, envStepTime, openGym);
   //// NS3-GYM
 
@@ -385,7 +402,11 @@ int main (int argc, char *argv[]) {
 
   YansWifiPhyHelper wifiPhyA =  YansWifiPhyHelper::Default ();
   // Se define la ganacia tras la recepcion de paquetes
-  wifiPhyA.Set ("RxGain", DoubleValue (-10) );
+  //AQUI
+  //AQUI
+  wifiPhyA.Set ("RxGain", DoubleValue (signalIntensity) );
+  //AQUI
+  //AQUI
   // ns-3 supports RadioTap and Prism tracing extensions for 802.11b
   wifiPhyA.SetPcapDataLinkType (WifiPhyHelper::DLT_IEEE802_11_RADIO);
 
@@ -469,7 +490,11 @@ int main (int argc, char *argv[]) {
 
   YansWifiPhyHelper wifiPhyB =  YansWifiPhyHelper::Default ();
   // Se define la ganacia tras la recepcion de paquetes
-  wifiPhyB.Set ("RxGain", DoubleValue (-10) );
+  //AQUI
+  //AQUI
+  wifiPhyB.Set ("RxGain", DoubleValue (signalIntensity) );
+  //AQUI
+  //AQUI
   // ns-3 supports RadioTap and Prism tracing extensions for 802.11b
   wifiPhyB.SetPcapDataLinkType (WifiPhyHelper::DLT_IEEE802_11_RADIO);
 
@@ -531,7 +556,11 @@ int main (int argc, char *argv[]) {
 
   YansWifiPhyHelper wifiPhyC =  YansWifiPhyHelper::Default ();
   // Se define la ganacia tras la recepcion de paquetes
-  wifiPhyC.Set ("RxGain", DoubleValue (-10) );
+  //AQUI
+  //AQUI
+  wifiPhyC.Set ("RxGain", DoubleValue (signalIntensity) );
+  //AQUI
+  //AQUI
   // ns-3 supports RadioTap and Prism tracing extensions for 802.11b
   wifiPhyC.SetPcapDataLinkType (WifiPhyHelper::DLT_IEEE802_11_RADIO);
 
@@ -635,3 +664,4 @@ int main (int argc, char *argv[]) {
 
   return 0;
 }
+
