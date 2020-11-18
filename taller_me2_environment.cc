@@ -206,6 +206,7 @@ int main (int argc, char *argv[]) {
   //--------------------------------------------------------------
 
   std::string phyMode ("DsssRate1Mbps");
+
   //AQUI
   //AQUI
   double distanceA = 100;  // distancia inicial entre nodos en el cuadrante A
@@ -224,12 +225,13 @@ int main (int argc, char *argv[]) {
   double originC_y = originA_y-(numNodesC/5 * distanceC)+distanceB;  // coordenada y origen del cuandrante C
   //AQUI
   //AQUI
+
   char sourceCluster = 'B'; // Sector de origen de los paquetes
   char sinkCluster = 'C'; // Sector de llegada de los paquetes
   interval = 1; // Intevalo entre paquetes
   bool verbose = false;
   bool tracing = false;
-  uint32_t simSeed = 5;  //semilla de simulacion
+  
   //AQUI
   //AQUI
   double signalIntensity = -10;
@@ -330,7 +332,7 @@ int main (int argc, char *argv[]) {
   NS_LOG_UNCOND("--seed: " << simSeed);
   NS_LOG_UNCOND("--testArg: " << testArg);
 
-  RngSeedManager::SetSeed (1);
+  RngSeedManager::SetSeed (simSeed);
   RngSeedManager::SetRun (simSeed);
 
   Ptr<OpenGymInterface> openGym = CreateObject<OpenGymInterface> (openGymPort);
